@@ -1,0 +1,78 @@
+﻿@using Blazored.Modal;
+@using Blazored.Modal.Services;
+@using semestralni_Navratilova.Model
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager Navigation
+
+<EditForm Model="newUser">
+    <DataAnnotationsValidator />
+
+    <div class="container">
+        <div class="row">
+            <div class="col-6">
+                <label>Jméno:</label>
+                <input @bind="newUser.FirstName" class="form-control"/>
+                <ValidationMessage For="() => newUser.FirstName" /> <br />
+
+                <label>Příjmení:</label>
+                <input @bind="newUser.LastName" class="form-control" />
+                <ValidationMessage For="() => newUser.LastName" /> <br />
+
+                <label>Datum narození:</label>
+                <input @bind="newUser.Birthday" class="form-control" />
+                <ValidationMessage For="() => newUser.Birthday" /> <br />
+
+                <label>Adresa:</label>
+                <input @bind="newUser.Adresse" class="form-control" />
+                <ValidationMessage For="() => newUser.Adresse" /> <br />
+
+                <label>Telefon:</label>
+                <input @bind="newUser.PhoneNumber" class="form-control" />
+                <ValidationMessage For="() => newUser.PhoneNumber" /> <br />
+
+                <label>E-mail:</label>
+                <input @bind="newUser.Email" class="form-control" />
+                <ValidationMessage For="() => newUser.Email" /> <br />
+
+                <label>Datum registrace:</label>
+                <input @bind="newUser.DateOfRegistration" class="form-control"/>
+                <ValidationMessage For="() => newUser.DateOfRegistration" />
+            </div>
+        </div>
+        <br />
+        <br />
+
+        <div class="row justify-content-end">
+            <div class="col-md-auto">
+            </div>
+            <div class="col-2">
+                <button @onclick="Continue" class="btn btn-success">Uložit</button>
+            </div>
+            <div class="col-2">
+                <button @onclick="Cancel" class="btn btn-secondary">Zrušit</button>
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance? ModalInstance { get; set; } = default!;
+    User newUser = new User();
+
+    async Task Continue()
+    {
+        var validationResults = new List<ValidationResult>();
+        var validationContext = new ValidationContext(newUser);
+        bool isValid = Validator.TryValidateObject(newUser, validationContext, validationResults, true);
+
+        if (isValid)
+        {
+            await ModalInstance.CloseAsync(ModalResult.Ok(newUser));
+        }
+    }
+
+    async Task Cancel()
+    {
+        await ModalInstance?.CancelAsync();
+    }
+}

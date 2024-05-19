@@ -1,0 +1,100 @@
+﻿@using Blazored.Modal;
+@using Blazored.Modal.Services;
+@using semestralni_Navratilova.Model
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager Navigation
+
+<EditForm Model="editedBook">
+    <DataAnnotationsValidator />
+
+    <div class="container">
+        <div class="row">
+            <div class="col-6">
+                <label>ISBN:</label>
+                <input @bind="editedBook.ISBN" class="form-control" />
+                <ValidationMessage For="() => editedBook.ISBN" /> <br />
+
+                <label>Název:</label>
+                <input @bind="editedBook.Name" class="form-control" />
+                <ValidationMessage For="() => editedBook.Name" /> <br />
+
+                <label>Autor:</label>
+                <input @bind="editedBook.Author" class="form-control" />
+                <ValidationMessage For="() => editedBook.Author" /> <br />
+
+                <label>Vazba:</label>
+                <select @bind="editedBook.Binding" class="form-control">
+                    <option value="pevná / vázaná">pevná / vázaná</option>
+                    <option value="měkká / brožovaná">měkká / brožovaná</option>
+                </select><br />
+
+                <label>Žánr:</label>
+                <input @bind="editedBook.Genre" class="form-control" />
+                <ValidationMessage For="() => editedBook.Genre" /> <br />
+
+                <label>Počet stran:</label>
+                <input @bind="editedBook.Pages" class="form-control" />
+                <ValidationMessage For="() => editedBook.Pages" /><br />
+            </div>
+            <div class="col-6">
+                <label>Nakladatelství:</label>
+                <input @bind="editedBook.Publisher" class="form-control" />
+                <ValidationMessage For="() => editedBook.Publisher" /> <br />
+
+                <label>Jazyk:</label>
+                <input @bind="editedBook.Language" class="form-control" />
+                <ValidationMessage For="() => editedBook.Language" /> <br />
+
+                <label>Překlad:</label>
+                <input @bind="editedBook.Translator" class="form-control" />
+                <ValidationMessage For="() => editedBook.Translator" /> <br />
+
+                <label>Rok vydání:</label>
+                <input @bind="editedBook.Year" class="form-control" />
+                <ValidationMessage For="() => editedBook.Year" /> <br />
+
+                <label>Počet všech ks:</label>
+                <input @bind="editedBook.Quantity" class="form-control" />
+                <ValidationMessage For="() => editedBook.Quantity" /><br />
+
+                <label>Počet ks k dispozici:</label>
+                <input @bind="editedBook.AvailablePieces" class="form-control" />
+            </div>
+        </div>
+        <br />
+        <br />
+
+        <div class="row justify-content-end">
+            <div class="col-md-auto">
+            </div>
+            <div class="col-1">
+                <button @onclick="Continue" class="btn btn-success">Uložit</button>
+            </div>
+            <div class="col-2">
+                <button @onclick="Cancel" class="btn btn-secondary">Zrušit</button>
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance? ModalInstance { get; set; } = default!;
+    [Parameter] public Book? editedBook { get; set; }
+
+    async Task Continue()
+    {
+        var validationResults = new List<ValidationResult>();
+        var validationContext = new ValidationContext(editedBook);
+        bool isValid = Validator.TryValidateObject(editedBook, validationContext, validationResults, true);
+
+        if (isValid)
+        {
+            await ModalInstance.CloseAsync(ModalResult.Ok(editedBook));
+        }
+    }
+
+    void Cancel()
+    {
+        ModalInstance?.CancelAsync();
+    }
+}

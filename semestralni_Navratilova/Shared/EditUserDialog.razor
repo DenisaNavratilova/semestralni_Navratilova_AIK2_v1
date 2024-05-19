@@ -1,0 +1,76 @@
+﻿@using Blazored.Modal;
+@using Blazored.Modal.Services;
+@using semestralni_Navratilova.Model
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager Navigation
+
+<EditForm Model="editedUser">
+<DataAnnotationsValidator />
+
+<div class="container">
+    <div class="row">
+        <div class="col-6">
+            <label>Jméno:</label>
+            <input @bind="editedUser.FirstName" class="form-control" />
+            <ValidationMessage For="() => editedUser.FirstName" /> <br />
+
+            <label>Příjmení:</label>
+            <input @bind="editedUser.LastName" class="form-control" />
+            <ValidationMessage For="() => editedUser.LastName" /> <br />
+
+            <label>Datum narození:</label>
+            <input @bind="editedUser.Birthday" class="form-control" />
+            <ValidationMessage For="() => editedUser.Birthday" /> <br />
+
+            <label>Adresa:</label>
+            <input @bind="editedUser.Adresse" class="form-control" />
+            <ValidationMessage For="() => editedUser.Adresse" /> <br />
+
+            <label>Telefon:</label>
+            <input @bind="editedUser.PhoneNumber" class="form-control" />
+            <ValidationMessage For="() => editedUser.PhoneNumber" /> <br />
+
+            <label>E-mail:</label>
+            <input @bind="editedUser.Email" class="form-control" />
+            <ValidationMessage For="() => editedUser.Email" /> <br />
+
+            <label>Datum registrace:</label>
+            <input @bind="editedUser.DateOfRegistration" class="form-control" />
+                <ValidationMessage For="() => editedUser.DateOfRegistration" /> <br /><br />
+        </div>
+    <br />
+    <br />
+
+        <div class="row">
+            <div class="col-8">
+                <button @onclick="Continue" class="btn btn-success">Uložit</button>
+            </div>
+            <div class="col-4">
+                <button @onclick="Cancel" class="btn btn-secondary">Zrušit</button>
+            </div>
+        </div>
+    </div>
+</div>
+</EditForm>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance? ModalInstance { get; set; } = default!;
+    [Parameter] public User? editedUser { get; set; }
+
+    async Task Continue()
+    {
+        var validationResults = new List<ValidationResult>();
+        var validationContext = new ValidationContext(editedUser);
+        bool isValid = Validator.TryValidateObject(editedUser, validationContext, validationResults, true);
+
+        if (isValid)
+        {
+            await ModalInstance.CloseAsync(ModalResult.Ok(editedUser));
+        }
+    }
+
+    void Cancel()
+    {
+        ModalInstance?.CancelAsync();
+    }
+}

@@ -1,0 +1,78 @@
+﻿<div class="@NavMenuCssClass nav-scrollable">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/">
+                <span class="oi oi-home" aria-hidden="true"></span> Domů
+            </NavLink>
+        </div>
+		<p></p>
+		<div class="nav-item px-3">
+			<span class="nav-link" id="main-menu" @onclick="ToggleEvidenceMenu">
+				<span class="oi oi-list" aria-hidden="true"></span> Evidence knih
+			</span>
+			<div class="sub-menu" style="display: @EvidenceMenuDisplay">
+				<NavLink class="nav-link" href="evidence/allbooks">
+					<span class="oi oi-plus" aria-hidden="true"></span> Přehled knih
+				</NavLink>
+				<NavLink class="nav-link" href="evidence/nonavailable">
+					<span class="oi oi-plus" aria-hidden="true"></span> Nedostupné
+				</NavLink>
+				<NavLink class="nav-link" href="evidence/available">
+					<span class="oi oi-plus" aria-hidden="true"></span> K dispozici
+				</NavLink>
+			</div>
+			<br />
+			<span class="nav-link" id="main-menu" @onclick="ToggleBorrowingsMenu">
+				<span class="oi oi-list" aria-hidden="true"></span> Zápůjčky knih
+			</span>
+			<div class="sub-menu" style="display: @BorrowingsMenuDisplay">
+				<NavLink class="nav-link" href="borrowingsMenu/borrowedbooks">
+					<span class="oi oi-plus" aria-hidden="true"></span> Evidence
+				</NavLink>
+				<NavLink class="nav-link" href="borrowingsMenu/actualborrowings">
+					<span class="oi oi-plus" aria-hidden="true"></span> Zapůjčené
+				</NavLink>
+				<NavLink class="nav-link" href="borrowingsMenu/returnedborrowings">
+					<span class="oi oi-plus" aria-hidden="true"></span> Vrácené
+				</NavLink>
+			</div>
+			<br />
+			<span class="nav-link" id="main-menu" @onclick="ToggleSettingsMenu">
+				<span class="oi oi-list" aria-hidden="true"></span> Nastavení
+			</span>
+			<div class="sub-menu" style="display: @SettingsMenuDisplay">
+				<NavLink class="nav-link" href="settings/users">
+					<span class="oi oi-plus" aria-hidden="true"></span> Uživatelé
+				</NavLink>
+			</div>
+		</div>
+    </nav>
+</div>
+
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool showEvidenceMenu = false;
+    private bool showBorrowingsMenu = false;
+    private bool showSettingsMenu = false;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private string EvidenceMenuDisplay => showEvidenceMenu ? "block" : "none";
+    private string BorrowingsMenuDisplay => showBorrowingsMenu ? "block" : "none";
+    private string SettingsMenuDisplay => showSettingsMenu ? "block" : "none";
+
+    public void ToggleEvidenceMenu()
+    {
+        showEvidenceMenu = !showEvidenceMenu;
+    }
+
+    public void ToggleBorrowingsMenu()
+    {
+        showBorrowingsMenu = !showBorrowingsMenu;
+    }
+
+    public void ToggleSettingsMenu()
+    {
+        showSettingsMenu = !showSettingsMenu;
+    }
+}

@@ -1,0 +1,18 @@
+﻿@using Blazored.Modal;
+@using Blazored.Modal.Services;
+
+<div class="row">
+	<div class="col">
+		<button @onclick="Continue" class="btn btn-secondary">OK</button>
+	</div>
+</div>
+
+@code {
+	[CascadingParameter] BlazoredModalInstance? ModalInstance { get; set; } = default!;
+	[Parameter] public string? Message { get; set; }
+
+	public async Task Continue()
+	{
+		await ModalInstance?.CloseAsync();
+	}
+}

@@ -1,0 +1,257 @@
+﻿@page "/settings/users"
+@using Microsoft.AspNetCore.SignalR.Client;
+@using Microsoft.EntityFrameworkCore;
+@using semestralni_Navratilova.Model;
+@using System.Text.RegularExpressions;
+@using semestralni_Navratilova.Data;
+@using semestralni_Navratilova.LibraryUsers;
+@using semestralni_Navratilova.Pages;
+@using Blazored.Modal;
+@using Blazored.Modal.Services;
+@inject Data.LibraryContext dbContext
+@inject LibraryUsers libraryUsers
+@inject NavigationManager Navigation
+@inject IBlazorContextMenuService blazorContextMenuService
+
+<PageTitle>Users</PageTitle>
+
+<h1>Nastavení uživatelů</h1>
+
+<br />
+<button class="btn btn-primary" @onclick="NewUser">Nový uživatel</button>
+<br />
+<br />
+
+@if (showSuccessMessage)
+{
+    <p><b>Uživatel byl registrován.</b></p>
+}
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Jméno</th>
+            <th>Příjmení</th>
+            <th>Datum narození</th>
+            <th>Adresa</th>
+            <th>Telefon</th>
+            <th>E-mail</th>
+            <th>Datum registrace</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var user in userList)
+        {
+            <tr>
+                <td><ContextMenuTrigger MenuId="UserContextMenu" Data="user">@user.UserId</ContextMenuTrigger></td>
+                <td><ContextMenuTrigger MenuId="UserContextMenu" Data="user">@user.FirstName</ContextMenuTrigger></td>
+                <td><ContextMenuTrigger MenuId="UserContextMenu" Data="user">@user.LastName</ContextMenuTrigger></td>
+                <td><ContextMenuTrigger MenuId="UserContextMenu" Data="user">@user.Birthday</ContextMenuTrigger></td>
+                <td><ContextMenuTrigger MenuId="UserContextMenu" Data="user">@user.Adresse</ContextMenuTrigger></td>
+                <td><ContextMenuTrigger MenuId="UserContextMenu" Data="user">@user.PhoneNumber</ContextMenuTrigger></td>
+                <td><ContextMenuTrigger MenuId="UserContextMenu" Data="user">@user.Email</ContextMenuTrigger></td>
+                <td><ContextMenuTrigger MenuId="UserContextMenu" Data="user">@user.DateOfRegistration</ContextMenuTrigger></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<ContextMenu Id="UserContextMenu">
+    <Item OnClick="@EditUser"> Upravit</Item>
+    <Item OnClick="@DeleteUser">Smazat</Item>
+</ContextMenu>
+
+@code {
+    List<User> userList = new List<User>();
+    private HubConnection? hubConnection;
+    private bool showSuccessMessage = false;
+    ModalResult? modalResult;
+    public User newUser = new User();
+    private string? errorMessage;
+    [CascadingParameter] IModalService? Modal { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        userList = await libraryUsers.GetAllUsers();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/userhub"))
+            .Build();
+
+        hubConnection.On<List<User>>("RefreshUsers", users =>
+        {
+            userList = users;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    async Task NewUser()
+    {
+        await HideBtnClick();
+        await ShowNewUserDialog();
+
+        if (modalResult is not null)
+        {
+            try
+            {
+                if (modalResult is not null && !modalResult.Cancelled)
+                {
+                    var newUser = modalResult.Data as User;
+                    Console.WriteLine(modalResult.ToString());
+                    if (newUser is not null)
+                    {
+                        Console.WriteLine(errorMessage);
+                        dbContext.Users.Add(newUser);
+                        await dbContext.SaveChangesAsync();
+                        userList.Add(newUser);
+                        showSuccessMessage = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"{ex.Message}";
+                Console.WriteLine(errorMessage);
+            }
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    async Task DeleteUser(ItemClickEventArgs e)
+    {
+        await HideBtnClick();
+        await ShowConfirmationDialog();
+
+        if (modalResult?.Cancelled == false)
+        {
+            try
+            {
+                var userToDelete = (User)e.Data;
+
+                var borrowings = await dbContext.Borrowings
+                    .Where(b => b.UserId == userToDelete.UserId)
+                    .ToListAsync();
+
+                var activeBorrowingExists = borrowings.Any(b => !b.IsReturned);
+
+                if (activeBorrowingExists)
+                {
+                    await ShowOKDialog("Uživatele nelze smazat, protože má na sobě stále aktivní zápůjčky.");
+                    return;
+                }
+                dbContext.Users.Remove(userToDelete);
+                await dbContext.SaveChangesAsync();
+                userList.Remove(userToDelete);
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"{ex.Message}";
+                Console.WriteLine(errorMessage);
+            }
+        }
+    }
+
+    async Task EditUser(ItemClickEventArgs e)
+    {
+        if (e is not null)
+        {
+            var selectedUser = e.Data as User;
+            if (selectedUser is not null)
+            {
+                await ShowEditUserDialog(selectedUser);
+            }
+        }
+
+        if (modalResult is not null)
+        {
+            try
+            {
+                if (modalResult.Cancelled == false)
+                {
+                    if (modalResult.Data is not null)
+                    {
+                        var editedUser = modalResult.Data as User;
+                        if (editedUser is not null)
+                        {
+                            if (userList.Exists(x => x.UserId.Equals(editedUser.UserId)))
+                            {
+                                userList[userList.IndexOf(userList.First(x => x.UserId.Equals(editedUser.UserId)))] = editedUser;
+                                dbContext.Users.Update(editedUser);
+                                await dbContext.SaveChangesAsync();
+                            }
+                            else
+                            {
+                                throw new Exception();
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"{ex.Message}";
+                Console.WriteLine(errorMessage);
+            }
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    async Task ShowConfirmationDialog()
+    {
+        var confirmModal = Modal?.Show<ConfirmationDialog>("Opravdu si přejete uživatele smazat z databáze?");
+
+        modalResult = await confirmModal.Result;
+    }
+
+    async Task ShowNewUserDialog()
+    {
+        var confirmModal = Modal?.Show<NewUserDialog>("Nový uživatel");
+
+        modalResult = await confirmModal.Result;
+    }
+
+    async Task ShowEditUserDialog(User? user)
+    {
+        var modalParameters = new ModalParameters();
+        modalParameters.Add(nameof(EditUserDialog.editedUser), user);
+
+        var confirmModal = Modal?.Show<EditUserDialog>("Editovat uživatele", modalParameters);
+        if (confirmModal is not null)
+        {
+            modalResult = await confirmModal.Result;
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    async Task ShowOKDialog(string message)
+    {
+        var parameters = new ModalParameters();
+        parameters.Add("Message", message);
+        var confirmModal = Modal?.Show<OKDialog>(message, parameters);
+        if (confirmModal is not null)
+        {
+            modalResult = await confirmModal.Result;
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    public async Task HideBtnClick()
+    {
+        await blazorContextMenuService.HideMenu("UserContextMenu");
+    }
+}

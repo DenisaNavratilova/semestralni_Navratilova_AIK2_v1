@@ -1,0 +1,145 @@
+﻿@page "/"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.SignalR.Client;
+@using semestralni_Navratilova.Model;
+@using System.Text.RegularExpressions;
+@using semestralni_Navratilova.Data;
+@using semestralni_Navratilova.LibraryBooks;
+@using semestralni_Navratilova.Pages;
+@using semestralni_Navratilova.Shared
+@using Blazored.Modal;
+@inject Data.LibraryContext dbContext
+@inject LibraryBooks libraryBooks
+@inject NavigationManager Navigation
+@inject IModalService Modal
+
+
+<PageTitle>Home</PageTitle>
+
+<div class="container mt-4">
+    <div class="jumbotron text-center">
+        <h2>Vítejte v portále knihovníků</h2>
+        <p class="lead">Tento portál vám umožní efektivně spravovat knihovnu, přidávat nové knihy, upravovat informace a sledovat zapůjčení knih.</p>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Přehled knih</h5>
+                    <p class="card-text">Zobrazit a spravovat všechny knihy ve vaší knihovně.</p>
+                    <a href="/evidence/allbooks" class="btn btn-primary">Zobrazit knihy</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Nová kniha</h5>
+                    <p class="card-text">Přidat novou knihu do knihovny.</p>
+                    <a class="btn btn-success" href="/evidence/allbooks" @onclick="NewBook">Přidat knihu</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Správa zápůjček</h5>
+                    <p class="card-text">Zobrazit všechny zápůjčky ve Vaší knihovně.</p>
+                    <a href="/borrowingsMenu/borrowedbooks" class="btn btn-info">Spravovat zapůjčení</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <br/>
+    <br />
+    <div class="row mt-5">
+        <div class="col-6">
+            <h3>Novinky</h3><br />
+            <ul>
+                <li>15. května 2024: Aktualizace systému pro rychlejší práci s portálem.</li>
+                <li>1. května 2024: Zaveden nový věrnostní program pro pravidelné čtenáře s výhodami a slevami.</li>
+                <li>15. dubna 2024: Organizujeme měsíční knižní kluby a diskuze s autory.</li>
+                <li>1. dubna 2024: Přidána možnost použití čteček a e-čteček.</li>
+                <li>15. března 2024: Přidána možnost sledování stavu výpůjček v reálném čase.</li>
+            </ul>
+        </div>
+        <div class="col-2"></div>
+        <div class="col-md-4">
+            <h3>Statistiky</h3><br/>
+            <p>Počet různých knih v knihovně: @totalBooks</p>
+            <p>Právě zapůjčené knihy: @borrowedBooks</p>
+            <p>Registrovaní uživatelé: @totalUsers</p>
+        </div>
+    </div>
+
+    <footer class="footer mt-auto py-3 bg-light">
+        <div class="container text-center">
+            <span class="text-muted">Máte nějaké dotazy nebo potřebujete pomoc? Kontaktujte podporu na <a href="mailto:support@portalknihovniku.cz">support@portalknihovniku.cz</a> nebo volejte na číslo +420 987 654 321.</span>
+        </div>
+    </footer>
+</div>
+
+@code {
+    private int totalBooks;
+    private int borrowedBooks;
+    private int totalUsers;
+    ModalResult? modalResult;
+    Book newBook = new Book();
+    List<Book> bookList = new List<Book>();
+    private string? errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        totalBooks = await dbContext.Books.CountAsync();
+        borrowedBooks = await dbContext.Borrowings.Where(borrowing => !borrowing.IsReturned).CountAsync();
+        totalUsers = await dbContext.Users.CountAsync();
+    }
+
+    async Task NewBook()
+    {
+        await ShowNewBookDialog();
+
+        if (modalResult is not null)
+        {
+            try
+            {
+                if (modalResult is not null && !modalResult.Cancelled)
+                {
+                    var newBook = modalResult.Data as Book;
+                    Console.WriteLine(modalResult.ToString());
+                    if (newBook is not null)
+                    {
+                        Console.WriteLine(errorMessage);
+                        dbContext.Books.Add(newBook);
+                        await dbContext.SaveChangesAsync();
+                        bookList.Add(newBook);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"{ex.Message}";
+                Console.WriteLine(errorMessage);
+            }
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    async Task ShowNewBookDialog()
+    {
+        var confirmModal = Modal?.Show<NewBookDialog>("Nová kniha");
+        if (confirmModal is not null)
+        {
+            modalResult = await confirmModal.Result;
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+}

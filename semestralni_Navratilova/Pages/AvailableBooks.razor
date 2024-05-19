@@ -1,0 +1,347 @@
+﻿@page "/evidence/available"
+@using Blazored.Modal;
+@using Microsoft.AspNetCore.SignalR.Client;
+@using semestralni_Navratilova.Model;
+@using System.Text.RegularExpressions;
+@using semestralni_Navratilova.Data;
+@using semestralni_Navratilova.LibraryBooks;
+@using semestralni_Navratilova.Pages
+@inject Data.LibraryContext dbContext
+@inject LibraryBooks libraryBooks
+@inject NavigationManager Navigation
+@inject IModalService Modal
+@inject IBlazorContextMenuService blazorContextMenuService
+
+<PageTitle>Knihy k dispozici</PageTitle>
+
+<h1>Přehled knih k dispozici</h1>
+
+<br />
+<br />
+
+<table>
+    <thead>
+        <tr>
+            <th class="column-id">ID</th>
+            <th class="column-isbn">ISBN</th>
+            <th class="column-title">Název</th>
+            <th class="column-author">Autor</th>
+            <th class="column-binding">Vazba</th>
+            <th class="column-genre">Žánr</th>
+            <th class="column-pages">Počet stran</th>
+            <th class="column-publisher">Nakladatelství</th>
+            <th class="column-language">Jazyk</th>
+            <th class="column-translator">Překladatel</th>
+            <th class="column-year">Rok vydání</th>
+            <th class="column-available">Počet ks k dispozici</th>
+            <th class="column-total">Celkový počet ks</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var book in AvailableBookList)
+        {
+            <tr>
+                <td class="column-id"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.BookId</ContextMenuTrigger></td>
+                <td class="column-isbn"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.ISBN</ContextMenuTrigger></td>
+                <td class="column-title"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Name</ContextMenuTrigger></td>
+                <td class="column-author"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Author</ContextMenuTrigger></td>
+                <td class="column-binding"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Binding</ContextMenuTrigger></td>
+                <td class="column-genre"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Genre</ContextMenuTrigger></td>
+                <td class="column-pages"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Pages</ContextMenuTrigger></td>
+                <td class="column-publisher"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Publisher</ContextMenuTrigger></td>
+                <td class="column-language"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Language</ContextMenuTrigger></td>
+                <td class="column-translator"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Translator</ContextMenuTrigger></td>
+                <td class="column-year"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Year</ContextMenuTrigger></td>
+                <td class="column-available"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.AvailablePieces</ContextMenuTrigger></td>
+                <td class="column-total"><ContextMenuTrigger MenuId="BookContextMenu" Data="book">@book.Quantity</ContextMenuTrigger></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<ContextMenu Id="BookContextMenu">
+    <Item OnClick="@EditBook">Upravit</Item>
+    <Item OnClick="@BorrowBook">Zapůjčit</Item>
+    <Item OnClick="@ReturnBook">Vrátit zapůjčení</Item>
+    <Item OnClick="@DeleteBook">Smazat</Item>
+</ContextMenu>
+
+@code {
+    List<Book> bookList = new List<Book>();
+    List<User> userList = new List<User>();
+    private HubConnection? hubConnection;
+    ModalResult? modalResult;
+    public int selectedUserId { get; set; }
+    private string? errorMessage;
+
+    public List<Book> AvailableBookList
+    {
+        get
+        {
+            return bookList.Where(book => book.AvailablePieces > 0).ToList();
+        }
+    }
+
+    async Task EditBook(ItemClickEventArgs e)
+    {
+        await HideBtnClick();
+
+        if (e is not null)
+        {
+            var bookId = ((Book)e.Data).BookId;
+            var selectedBook = await dbContext.Books.FindAsync(bookId);
+
+            if (selectedBook is not null)
+            {
+                await ShowEditBookDialog(selectedBook);
+            }
+        }
+
+        if (modalResult is not null)
+        {
+            try
+            {
+                if (modalResult.Cancelled == false)
+                {
+                    if (modalResult.Data is not null)
+                    {
+                        var editedBook = modalResult.Data as Book;
+                        if (editedBook is not null)
+                        {
+                            if (bookList.Exists(x => x.BookId.Equals(editedBook.BookId)))
+                            {
+                                bookList[bookList.IndexOf(bookList.First(x => x.BookId.Equals(editedBook.BookId)))] = editedBook;
+                                dbContext.Books.Update(editedBook);
+                                await dbContext.SaveChangesAsync();
+                            }
+                            else
+                            {
+                                throw new Exception();
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"{ex.Message}";
+                Console.WriteLine(errorMessage);
+            }
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    async Task BorrowBook(ItemClickEventArgs e)
+    {
+        await HideBtnClick();
+
+        try
+        {
+            var bookId = ((Book)e.Data).BookId;
+            var bookToBorrow = await dbContext.Books.FindAsync(bookId);
+
+            if (bookToBorrow != null && bookToBorrow.AvailablePieces > 0)
+            {
+                await ShowBorrowDialog();
+
+                if (modalResult?.Cancelled == false)
+                {
+                    selectedUserId = (int)modalResult.Data;
+                    bookToBorrow.AvailablePieces--;
+
+                    var index = bookList.FindIndex(b => b.BookId == bookToBorrow.BookId);
+                    if (index > -1)
+                    {
+                        bookList[index].AvailablePieces = bookToBorrow.AvailablePieces;
+                    }
+
+                    dbContext.Books.Update(bookToBorrow);
+                    await dbContext.SaveChangesAsync();
+
+                    var borrowing = new Borrowing
+                        {
+                            UserId = selectedUserId,
+                            BookId = bookId,
+                            DateOfBorrow = DateTime.Now,
+                            IsReturned = false
+                        };
+
+                    dbContext.Borrowings.Add(borrowing);
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                await ShowOKDialog("Tuto knihu nelze zapůjčit, již nezbývá žádný počet výtisků.");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"{ex.Message}";
+            Console.WriteLine(errorMessage);
+        }
+    }
+
+
+    async Task ReturnBook(ItemClickEventArgs e)
+    {
+        await HideBtnClick();
+
+        try
+        {
+            var bookId = ((Book)e.Data).BookId;
+            var bookToReturn = await dbContext.Books.FindAsync(bookId);
+
+            if (bookToReturn != null && bookToReturn.AvailablePieces < bookToReturn.Quantity)
+            {
+                await ShowReturnDialog();
+
+                if (modalResult?.Cancelled == false)
+                {
+                    selectedUserId = (int)modalResult.Data;
+                    bookToReturn.AvailablePieces++;
+                    dbContext.Books.Update(bookToReturn);
+                    await dbContext.SaveChangesAsync();
+
+                    var index = bookList.FindIndex(b => b.BookId == bookToReturn.BookId);
+                    if (index > -1)
+                    {
+                        bookList[index].AvailablePieces = bookToReturn.AvailablePieces;
+                    }
+                }
+            }
+            else
+            {
+                await ShowOKDialog("Tuto knihu nelze vrátit, počet ks k dispozici již odpovídá celkovému počtu výtisků v knihovně.");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"{ex.Message}";
+            Console.WriteLine(errorMessage);
+        }
+    }
+
+    async Task DeleteBook(ItemClickEventArgs e)
+    {
+        await HideBtnClick();
+        await ShowConfirmationDialog();
+
+        if (modalResult is not null && e is not null)
+        {
+            try
+            {
+                if (modalResult.Cancelled == false)
+                {
+                    var bookId = ((Book)e.Data).BookId;
+                    var bookToDelete = await dbContext.Books.FindAsync(bookId);
+
+                    if (bookToDelete is not null)
+                    {
+                        bookList.Remove(bookToDelete);
+                        dbContext.Books.Remove(bookToDelete);
+                        await dbContext.SaveChangesAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"{ex.Message}";
+                Console.WriteLine(errorMessage);
+            }
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        bookList = await libraryBooks.GetAllBooks();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/bookhub"))
+            .Build();
+
+        hubConnection.On<List<Book>>("RefreshBooks", books =>
+        {
+            bookList = books;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    async Task ShowOKDialog(string message)
+    {
+        var parameters = new ModalParameters();
+        parameters.Add("Message", message);
+        var confirmModal = Modal?.Show<OKDialog>(message, parameters);
+        if (confirmModal is not null)
+        {
+            modalResult = await confirmModal.Result;
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    async Task ShowConfirmationDialog()
+    {
+        var confirmModal = Modal?.Show<ConfirmationDialog>("Opravdu si přejete knihu smazat z databáze?");
+        if (confirmModal is not null)
+        {
+            modalResult = await confirmModal.Result;
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    async Task ShowBorrowDialog()
+    {
+        var borrowModal = Modal?.Show<BorrowDialog>("Zapůjčit knihu: ");
+
+        if (borrowModal != null)
+        {
+            modalResult = await borrowModal.Result;
+        }
+    }
+
+    async Task ShowReturnDialog()
+    {
+        var returnModal = Modal?.Show<ReturnDialog>("Vrátit knihu: ");
+
+        if (returnModal != null)
+        {
+            modalResult = await returnModal.Result;
+        }
+    }
+
+    async Task ShowEditBookDialog(Book? book)
+    {
+        var modalParameters = new ModalParameters();
+        modalParameters.Add(nameof(EditBookDialog.editedBook), book);
+
+        var confirmModal = Modal?.Show<EditBookDialog>("Editovat knihu", modalParameters);
+        if (confirmModal is not null)
+        {
+            modalResult = await confirmModal.Result;
+        }
+        else
+        {
+            throw new Exception();
+        }
+    }
+
+    async Task HideBtnClick()
+    {
+        await blazorContextMenuService.HideMenu("BookContextMenu");
+    }
+}

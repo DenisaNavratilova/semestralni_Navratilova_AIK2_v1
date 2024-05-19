@@ -1,0 +1,172 @@
+﻿@page "/borrowingsMenu/actualborrowings"
+@using Microsoft.AspNetCore.SignalR.Client;
+@using Microsoft.EntityFrameworkCore;
+@using semestralni_Navratilova.Model;
+@using System.Text.RegularExpressions;
+@using semestralni_Navratilova.Data;
+@using semestralni_Navratilova.LibraryBooks;
+@using semestralni_Navratilova.LibraryUsers;
+@using semestralni_Navratilova.LibraryBorrowings;
+@using semestralni_Navratilova.Pages;
+@using Blazored.Modal;
+@inject Data.LibraryContext dbContext
+@inject LibraryBooks libraryBooks
+@inject LibraryUsers libraryUsers
+@inject LibraryBorrowings libraryBorrowings
+@inject NavigationManager Navigation
+@inject IModalService Modal
+@inject IBlazorContextMenuService blazorContextMenuService
+
+<PageTitle>BorrowedBooks</PageTitle>
+
+<h1>Aktuálně zapůjčené knihy</h1>
+
+<br />
+<br />
+
+<table>
+    <thead>
+        <tr>
+            <th class="column-book">Vypůjčená kniha</th>
+            <th class="column-borrower">Vypůjčitel</th>
+            <th class="column-borrow-date">Datum vypůjčení</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var borrowing in actualBorrowingsList)
+        {
+            <tr>
+                <td class="column-book">
+                    <ContextMenuTrigger MenuId="BorrowingContextMenu" Data="@borrowing">
+                        @if (borrowing?.Book != null)
+                        {
+                            @($"{borrowing.Book.Name}, {borrowing.Book.Author}")
+                        }
+                    </ContextMenuTrigger>
+                </td>
+                <td class="column-borrower">
+                    <ContextMenuTrigger MenuId="BorrowingContextMenu" Data="@borrowing">
+                        @if (borrowing?.User != null)
+                        {
+                            @($"{borrowing.User.FirstName} {borrowing.User.LastName}, {borrowing.User.Birthday}")
+                        }
+                    </ContextMenuTrigger>
+                </td>
+                <td class="column-borrow-date">
+                    <ContextMenuTrigger MenuId="BorrowingContextMenu" Data="@borrowing">
+                        @if (borrowing != null)
+                        {
+                            @borrowing.DateOfBorrow
+                        }
+                    </ContextMenuTrigger>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<ContextMenu Id="BorrowingContextMenu">
+    <Item OnClick="@ReturnBook">Vrátit zapůjčení</Item>
+</ContextMenu>
+
+@code {
+    private HubConnection? hubConnection;
+    public int selectedUserId { get; set; }
+    private string? errorMessage = string.Empty;
+    List<Book> bookList = new List<Book>();
+    List<User> userList = new List<User>();
+    private List<Borrowing> borrowedBooksList = new List<Borrowing>();
+
+    public List<Borrowing> actualBorrowingsList
+    {
+        get
+        {
+            return borrowedBooksList.Where(borrowing => !borrowing.IsReturned).ToList();
+        }
+    }
+
+    public async Task LoadBorrowedBooks()
+    {
+        borrowedBooksList = await dbContext.Borrowings
+            .Include(b => b.User)
+            .Include(b => b.Book)
+            .ToListAsync();
+
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        userList = await libraryUsers.GetAllUsers();
+        bookList = await libraryBooks.GetAllBooks();
+        borrowedBooksList = await libraryBorrowings.GetAllBorrowings();
+        await LoadBorrowedBooks();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/borrowinghub"))
+            .Build();
+
+        hubConnection.On<List<Borrowing>>("RefreshBorrowings", borrowings =>
+        {
+            borrowedBooksList = borrowings;
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+
+        await base.OnInitializedAsync();
+    }
+
+    async Task ReturnBook(ItemClickEventArgs e)
+    {
+        await HideBtnClick();
+
+        try
+        {
+            var borrowingId = ((Borrowing)e.Data).BorrowingId;
+            var borrowing = await dbContext.Borrowings.FindAsync(borrowingId);
+
+            if (borrowing != null)
+            {
+                var bookId = borrowing.BookId;
+                var bookToReturn = await dbContext.Books.FindAsync(bookId);
+
+                borrowing.DateOfReturn = DateTime.Now;
+                borrowing.IsReturned = true;
+                dbContext.Borrowings.Update(borrowing);
+                await dbContext.SaveChangesAsync();
+
+                if (bookToReturn != null)
+                {
+                    bookToReturn.AvailablePieces++;
+                    dbContext.Books.Update(bookToReturn);
+                    await dbContext.SaveChangesAsync();
+
+                    var index = bookList.FindIndex(b => b.BookId == bookToReturn.BookId);
+                    if (index > -1)
+                    {
+                        bookList[index].AvailablePieces = bookToReturn.AvailablePieces;
+                    }
+                }
+
+                if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
+                {
+                    await hubConnection.SendAsync("RefreshBorrowings", borrowedBooksList);
+                }
+                StateHasChanged();
+                await LoadBorrowedBooks();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"{ex.Message}";
+            Console.WriteLine(errorMessage);
+        }
+    }
+
+    async Task HideBtnClick()
+    {
+        await blazorContextMenuService.HideMenu("BorrowingContextMenu");
+    }
+
+}

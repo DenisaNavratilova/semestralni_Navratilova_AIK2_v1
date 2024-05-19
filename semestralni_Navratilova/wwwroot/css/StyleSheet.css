@@ -1,0 +1,59 @@
+﻿.users-page {
+    font-family: Arial, sans-serif;
+}
+
+    .users-page h1 {
+        color: #333;
+        font-size: 24px;
+        margin-bottom: 20px;
+    }
+
+    .users-page button {
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+        .users-page button:hover {
+            background-color: #0056b3;
+        }
+
+    .users-page form {
+        margin-top: 20px;
+    }
+
+    .users-page label {
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    .users-page input[type="text"],
+    .users-page input[type="date"] {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    .users-page input[type="submit"] {
+        background-color: #28a745;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+        .users-page input[type="submit"]:hover {
+            background-color: #218838;
+        }
+
+    .users-page .success-message {
+        color: #28a745;
+        font-weight: bold;
+        margin-top: 10px;
+    }

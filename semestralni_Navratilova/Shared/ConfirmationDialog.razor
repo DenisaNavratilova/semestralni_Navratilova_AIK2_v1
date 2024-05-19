@@ -1,0 +1,25 @@
+﻿@using Blazored.Modal;
+@using Blazored.Modal.Services;
+
+<div class="row">
+	<div class="col-8">
+		<button @onclick="Continue" class="btn btn-danger">Ano, pokračovat</button>
+	</div>
+	<div class="col-4">
+	<button @onclick="Cancel" class="btn btn-secondary">Ne</button>
+	</div>
+</div>
+
+@code {
+	[CascadingParameter] BlazoredModalInstance? ModalInstance { get; set; } = default!;
+
+	void Continue()
+	{
+		ModalInstance?.CloseAsync();
+	}
+
+	void Cancel()
+	{
+		ModalInstance?.CancelAsync();
+	}
+}

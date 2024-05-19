@@ -1,0 +1,52 @@
+﻿@using Blazored.Modal;
+@using Blazored.Modal.Services;
+@using semestralni_Navratilova.LibraryUsers
+@using semestralni_Navratilova.Model
+@inject LibraryUsers libraryUsers
+
+<div>
+    <p>Vyberte uživatele, který vrací knihu:</p>
+
+    <select @bind="selectedUserId" class="form-control">
+        @foreach (var user in userList)
+        {
+            <option value="@user.UserId">@user.FirstName @user.LastName @user.Birthday</option>
+        }
+    </select>
+    <br/>
+
+    <div class="row">
+        <div class="col-8">
+            <button @onclick="ReturnBook" class="btn btn-success">Vrátit knihu</button>
+        </div>
+        <div class="col-4">
+            <button @onclick="Cancel" class="btn btn-secondary">Zrušit</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance? ModalInstance { get; set; }
+    List<User> userList = new List<User>();
+    int selectedUserId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        userList = await libraryUsers.GetAllUsers();
+
+        if(userList != null)
+        {
+            selectedUserId = userList.First().UserId;
+        }
+    }
+
+    public async Task ReturnBook()
+    {
+        await ModalInstance?.CloseAsync(ModalResult.Ok(selectedUserId));
+    }
+
+    public async Task Cancel()
+    {
+        await ModalInstance?.CancelAsync();
+    }
+}

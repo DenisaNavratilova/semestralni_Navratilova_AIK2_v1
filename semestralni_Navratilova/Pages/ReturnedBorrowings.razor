@@ -1,0 +1,94 @@
+﻿@page "/borrowingsMenu/returnedborrowings"
+@using Microsoft.AspNetCore.SignalR.Client;
+@using Microsoft.EntityFrameworkCore;
+@using semestralni_Navratilova.Model;
+@using System.Text.RegularExpressions;
+@using semestralni_Navratilova.Data;
+@using semestralni_Navratilova.LibraryBooks;
+@using semestralni_Navratilova.LibraryUsers;
+@using semestralni_Navratilova.LibraryBorrowings;
+@using semestralni_Navratilova.Pages;
+@using Blazored.Modal;
+@inject Data.LibraryContext dbContext
+@inject LibraryBooks libraryBooks
+@inject LibraryUsers libraryUsers
+@inject LibraryBorrowings libraryBorrowings
+@inject NavigationManager Navigation
+@inject IModalService Modal
+@inject IBlazorContextMenuService blazorContextMenuService
+
+<PageTitle>ReturnedBorrowings</PageTitle>
+
+<h1>Vrácené zápůjčky</h1>
+
+<br />
+<br />
+
+<table>
+    <thead>
+        <tr>
+            <th class="column-book">Vypůjčená kniha</th>
+            <th class="column-borrower">Vypůjčitel</th>
+            <th class="column-borrow-date">Datum vypůjčení</th>
+            <th class="column-returned">Vráceno</th>
+            <th class="column-return-date">Datum vrácení</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var borrowing in returnedBorrowingsList)
+        {
+            <tr>
+                <td class="column-book">@borrowing.Book.Name, @borrowing.Book.Author</td>
+                <td class="column-borrower">@borrowing.User.FirstName @borrowing.User.LastName, @borrowing.User.Birthday</td>
+                <td class="column-borrow-date">@borrowing.DateOfBorrow</td>
+                <td class="column-returned"><input type="checkbox" checked="@borrowing.IsReturned" disabled /></td>
+                <td class="column-return-date">@borrowing.DateOfReturn</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private HubConnection? hubConnection;
+    List<Book> bookList = new List<Book>();
+    List<User> userList = new List<User>();
+    private List<Borrowing> borrowedBooksList = new List<Borrowing>();
+
+    public List<Borrowing> returnedBorrowingsList
+    {
+        get
+        {
+            return borrowedBooksList.Where(borrowing => borrowing.IsReturned).ToList();
+        }
+    }
+
+    public async Task LoadBorrowedBooks()
+    {
+        borrowedBooksList = await dbContext.Borrowings
+            .Include(b => b.User)
+            .Include(b => b.Book)
+            .ToListAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        userList = await libraryUsers.GetAllUsers();
+        bookList = await libraryBooks.GetAllBooks();
+        borrowedBooksList = await libraryBorrowings.GetAllBorrowings();
+        await LoadBorrowedBooks();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/borrowinghub"))
+            .Build();
+
+        hubConnection.On<List<Borrowing>>("RefreshBorrowings", borrowings =>
+        {
+            borrowedBooksList = borrowings;
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+
+        await base.OnInitializedAsync();
+    }
+}
